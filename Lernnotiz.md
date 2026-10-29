@@ -5,4 +5,4 @@ Was ist GitHub?:
 GitHub ist die Plattform wo du deinen Aktuellen code mit Versionshistorie speichern kannst.
 
 Was bedeutet Lokal?:
-Lokal bedeutet auf deinen Rechner. Der Code befindet sich auf deinen Rechner.
+Lokal bedeutet auf deinen Rechner. Der Code befindet sich auf deinen Rechner. dsa

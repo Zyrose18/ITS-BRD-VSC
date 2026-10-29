@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define TEXT_LAENGE 32  // Puffer fuer eine Ausgabezeile
+#define TEXT_LAENGE 32   // Puffer fuer eine Ausgabezeile
 #define ANZAHL_GROSS_P 3 // P zeigt die drei obersten Werte
 
 static bool fehler_aktiv = false; // true: nur noch C wird angenommen
