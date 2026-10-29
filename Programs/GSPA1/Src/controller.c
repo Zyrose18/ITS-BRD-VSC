@@ -20,7 +20,6 @@ static int fehler_aktiv = 0;
 static void zahl_ausgeben(int zahl) {
    char text[TEXT_LAENGE];
    // Die Laenge ist mit TEXT_LAENGE begrenzt, snprintf_s gibt es hier nicht.
-   // NOLINTNEXTLINE(clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
    snprintf(text, TEXT_LAENGE, "%d\n", zahl);
    if (is_bottom_line()) {
       clear_stdout(); // Fenster voll: erst leeren
@@ -40,15 +39,16 @@ static int oberste_anzeigen(void) {
    return push(zahl);
 }
 
-// P: die drei obersten Zahlen anzeigen (weniger, wenn weniger da sind).
-// Danach alle wieder in der alten Reihenfolge drauflegen.
+
 static int drei_anzeigen(void) {
    int erste = 0;
    int zweite = 0;
    int dritte = 0;
+   int status = 0;
 
-   if (pop(&erste) != OK) {
-      return FEHLER_STACK_LEER; // gar nichts auf dem Stack
+   status = pop(&erste);
+   if (status != OK) {
+      return status; // gar nichts auf dem Stack
    }
    zahl_ausgeben(erste);
 
