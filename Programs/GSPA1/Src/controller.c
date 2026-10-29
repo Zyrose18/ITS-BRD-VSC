@@ -19,8 +19,6 @@ static int fehler_aktiv = 0;
 // Zeigt eine Zahl in einer eigenen Zeile an.
 static void zahl_ausgeben(int zahl) {
    char text[TEXT_LAENGE];
-   // snprintf funktioniert wie printf, schreibt aber in den Text statt
-   // auf den Bildschirm. Das Display braucht Text, keine Zahl.
    // Die Laenge ist mit TEXT_LAENGE begrenzt, snprintf_s gibt es hier nicht.
    // NOLINTNEXTLINE(clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
    snprintf(text, TEXT_LAENGE, "%d\n", zahl);
@@ -93,7 +91,7 @@ static int tauschen(void) {
    if (status != OK) {
       return status;
    }
-   push(oberste);       // die alte oberste kommt nach unten
+   push(oberste); // die alte oberste kommt nach unten
    return push(zweite); // die alte zweite kommt nach oben
 }
 
