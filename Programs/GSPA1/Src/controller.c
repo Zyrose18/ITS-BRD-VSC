@@ -1,6 +1,7 @@
 /**
  * @file controller.c
- * @brief Ordnet jedem Token eine Aktion zu und meldet Fehler einheitlich.
+ * @brief Entscheidet anhand des Tokens, was der Rechner tun soll,
+ *        und zeigt Ergebnisse und Fehler auf dem Display an.
  */
 
 #include "controller.h"
@@ -8,63 +9,76 @@
 #include "fehler.h"
 #include "rechner.h"
 #include "stack.h"
-#include <stdbool.h>
 #include <stdio.h>
 
-#define TEXT_LAENGE 32   // Puffer fuer eine Ausgabezeile
-#define ANZAHL_GROSS_P 3 // P zeigt die drei obersten Werte
+#define TEXT_LAENGE 32 // Platz fuer eine Zeile Text
 
-static bool fehler_aktiv = false; // true: nur noch C wird angenommen
+// 0 = alles normal, 1 = ein Fehler ist aufgetreten (dann nur noch C erlaubt)
+static int fehler_aktiv = 0;
 
-// Gibt eine Zahl in einer eigenen Zeile auf dem Display aus.
-static void zahl_ausgeben(int wert) {
+// Zeigt eine Zahl in einer eigenen Zeile an.
+static void zahl_ausgeben(int zahl) {
    char text[TEXT_LAENGE];
-   (void)snprintf(text, sizeof(text), "%d\n", wert);
+   // snprintf funktioniert wie printf, schreibt aber in den Text statt
+   // auf den Bildschirm. Das Display braucht Text, keine Zahl.
+   // Die Laenge ist mit TEXT_LAENGE begrenzt, snprintf_s gibt es hier nicht.
+   // NOLINTNEXTLINE(clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
+   snprintf(text, TEXT_LAENGE, "%d\n", zahl);
    if (is_bottom_line()) {
-      clear_stdout();
+      clear_stdout(); // Fenster voll: erst leeren
    }
    print_stdout(text);
 }
 
-// p: oberste Zahl anzeigen, ohne den Stack zu veraendern.
+// p: oberste Zahl anzeigen. Danach wieder drauflegen, damit der
+// Stack gleich bleibt.
 static int oberste_anzeigen(void) {
-   int wert = 0;
-   int status = pop(&wert);
+   int zahl = 0;
+   int status = pop(&zahl);
    if (status != OK) {
       return status;
    }
-   zahl_ausgeben(wert);
-   return push(wert);
+   zahl_ausgeben(zahl);
+   return push(zahl);
 }
 
-// P: die (bis zu) drei obersten Zahlen anzeigen, Stack bleibt gleich.
+// P: die drei obersten Zahlen anzeigen (weniger, wenn weniger da sind).
+// Danach alle wieder in der alten Reihenfolge drauflegen.
 static int drei_anzeigen(void) {
-   int werte[ANZAHL_GROSS_P];
-   int gefunden = 0;
-   while (gefunden < ANZAHL_GROSS_P && pop(&werte[gefunden]) == OK) {
-      gefunden++;
+   int erste = 0;
+   int zweite = 0;
+   int dritte = 0;
+
+   if (pop(&erste) != OK) {
+      return FEHLER_STACK_LEER; // gar nichts auf dem Stack
    }
-   if (gefunden == 0) {
-      return FEHLER_STACK_LEER;
+   zahl_ausgeben(erste);
+
+   if (pop(&zweite) != OK) {
+      return push(erste); // nur eine Zahl war da
    }
-   for (int i = 0; i < gefunden; i++) {
-      zahl_ausgeben(werte[i]); // oberste zuerst
+   zahl_ausgeben(zweite);
+
+   if (pop(&dritte) != OK) {
+      push(zweite);
+      return push(erste); // nur zwei Zahlen waren da
    }
-   for (int i = gefunden - 1; i >= 0; i--) {
-      (void)push(werte[i]); // in alter Reihenfolge zurueck
-   }
-   return OK;
+   zahl_ausgeben(dritte);
+
+   push(dritte);
+   push(zweite);
+   return push(erste);
 }
 
-// d: oberste Zahl verdoppeln.
+// d: oberste Zahl verdoppeln (zweimal drauflegen).
 static int duplizieren(void) {
-   int wert = 0;
-   int status = pop(&wert);
+   int zahl = 0;
+   int status = pop(&zahl);
    if (status != OK) {
       return status;
    }
-   (void)push(wert);
-   return push(wert);
+   push(zahl);
+   return push(zahl);
 }
 
 // r: die beiden obersten Zahlen tauschen.
@@ -79,41 +93,44 @@ static int tauschen(void) {
    if (status != OK) {
       return status;
    }
-   (void)push(oberste);
-   return push(zweite);
+   push(oberste);       // die alte oberste kommt nach unten
+   return push(zweite); // die alte zweite kommt nach oben
 }
 
-// Liefert den Anzeigetext zu einem Fehlercode.
-static char *fehler_text(int code) {
-   switch (code) {
-   case FEHLER_STACK_VOLL:
-      return "Fehler: Stack voll\n";
-   case FEHLER_STACK_LEER:
-      return "Fehler: Stack leer\n";
-   case FEHLER_DIV_NULL:
-      return "Fehler: Division durch 0\n";
-   case FEHLER_UEBERLAUF:
-      return "Fehler: Ueberlauf\n";
-   case FEHLER_ZAHL_ZU_GROSS:
-      return "Fehler: Zahl zu gross\n";
-   default:
-      return "Fehler: unbekannte Taste\n";
+// Zeigt zum Fehlercode den passenden Text in Rot an.
+static void fehler_anzeigen(int code) {
+   set_err_mode(); // Fenster leeren, Schrift rot
+   if (code == FEHLER_STACK_VOLL) {
+      print_stdout("Fehler: Stack voll\n");
+   } else if (code == FEHLER_STACK_LEER) {
+      print_stdout("Fehler: Stack leer\n");
+   } else if (code == FEHLER_DIV_NULL) {
+      print_stdout("Fehler: Division durch 0\n");
+   } else if (code == FEHLER_UEBERLAUF) {
+      print_stdout("Fehler: Ueberlauf\n");
+   } else if (code == FEHLER_ZAHL_ZU_GROSS) {
+      print_stdout("Fehler: Zahl zu gross\n");
+   } else {
+      print_stdout("Fehler: unbekannte Taste\n");
    }
+   print_stdout("Weiter mit C\n");
 }
 
 void verarbeite_token(T_token token) {
-   if (fehler_aktiv) {
+   // Nach einem Fehler wird nur noch C angenommen.
+   if (fehler_aktiv == 1) {
       if (token.tok == CLEAR) {
          stack_leeren();
-         fehler_aktiv = false;
-         set_normal_mode();
+         fehler_aktiv = 0;
+         set_normal_mode(); // Fenster leeren, Schrift wieder schwarz
       }
       return;
    }
 
    int status = OK;
+
    switch (token.tok) {
-   case NUMBER:
+   case NUMBER: // eine Zahl wurde eingegeben
       status = push(token.val);
       break;
    case PLUS:
@@ -128,34 +145,33 @@ void verarbeite_token(T_token token) {
    case DIV:
       status = dividieren();
       break;
-   case PRT:
+   case PRT: // p
       status = oberste_anzeigen();
       break;
-   case PRT_ALL:
+   case PRT_ALL: // P
       status = drei_anzeigen();
       break;
-   case CLEAR:
+   case DOUBLE: // d
+      status = duplizieren();
+      break;
+   case SWAP: // r
+      status = tauschen();
+      break;
+   case CLEAR: // C
       stack_leeren();
       clear_stdout();
       break;
-   case DOUBLE:
-      status = duplizieren();
-      break;
-   case SWAP:
-      status = tauschen();
-      break;
-   case OVERFLOW:
+   case OVERFLOW: // Zahl war zu gross fuer int
       status = FEHLER_ZAHL_ZU_GROSS;
       break;
-   default:
+   default: // alles andere
       status = FEHLER_UNBEKANNTE_TASTE;
       break;
    }
 
    if (status != OK) {
-      fehler_aktiv = true;
-      set_err_mode();
-      print_stdout(fehler_text(status));
+      fehler_aktiv = 1;
+      fehler_anzeigen(status);
    }
 }
 
